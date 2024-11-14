@@ -6,6 +6,7 @@ from detail import Detail
 from player import Player
 from coin import Coin
 from enemy import Enemy
+from boss import Boss
 
 pygame.font.init()
 font = pygame.font.Font('assets/Ui/Font/NormalFont.ttf', 32)
@@ -16,9 +17,13 @@ class World:
         self.floor_data = floor_data
         self.detail_data = detail_data
         self.num_coins = 10
-        self.time_left = 90
+        self.game_length = 30
+        self.time_left = self.game_length
         self._setup_floor(self.floor_data)
         self._setup_details(self.detail_data)
+        # self._spawn_boss(200, 200)
+        self.game_over = False
+        self.frames = 0
 
     def _setup_floor(self, data):
         self.floor_tiles = pygame.sprite.Group()
@@ -49,6 +54,11 @@ class World:
         for i in range(self.num_coins):
             self._spawn_coin()
 
+    def _spawn_boss(self, x, y):
+        self.boss = pygame.sprite.Group()
+        boss = Boss((x, y))
+        self.boss.add(boss)
+
     def _spawn_coin(self):
         # Initial spawn
         row_index = random.randint(0, len(detail_map) - 1)
@@ -71,7 +81,8 @@ class World:
                 coin.kill()
                 self._spawn_coin()
 
-    def update(self, keys):
+    def _running_update(self, keys):
+        self.frames += 1
         self._coin_collision()
         # Draw and update floor tiles
         self.floor_tiles.update()
@@ -85,6 +96,9 @@ class World:
         # Update enemies
         self.enemies.update(self.player.sprite, self.detail_tiles.sprites())
         self.enemies.draw(self.screen)
+        # Update boss
+        # self.boss.update()
+        # self.boss.draw(self.screen)
         # Draw and update player
         self.player.update(WIDTH, HEIGHT, keys, self.enemies.sprites(), self.detail_tiles.sprites())
         self.player.draw(self.screen)
@@ -92,6 +106,40 @@ class World:
         text = font.render('Score: ' + str(self.player.sprite.score), False, (255, 255, 255))
         self.screen.blit(text, (10, 0))
         # Update timer
-        self.time_left = 90 - pygame.time.get_ticks() // 1000
+        self.time_left = self.game_length - (self.frames // 60)
         text = font.render('Time: ' + str(self.time_left), False, (255, 255, 255))
         self.screen.blit(text, (640, 0))
+        if self.time_left == 0:
+            self.game_over = True
+            self.frames = 0
+
+    def _game_over_update(self, keys):
+        pygame.draw.rect(self.screen, (255, 255, 255), pygame.Rect(WIDTH // 2 - 210, HEIGHT // 2 - 110, 420, 220))
+        pygame.draw.rect(self.screen, (102, 153, 153), pygame.Rect(WIDTH // 2 - 200, HEIGHT // 2 - 100, 400, 200))
+        game_over_font = pygame.font.Font('assets/Ui/Font/NormalFont.ttf', 64)
+        text = game_over_font.render('Game Over', False, (255, 255, 255))
+        self.screen.blit(text, (WIDTH // 2 - 180, HEIGHT // 2 - 100))
+        text = font.render('Score: ' + str(self.player.sprite.score), False, (255, 255, 255))
+        self.screen.blit(text, (WIDTH // 2 - 75, HEIGHT // 2))
+        restart_font = pygame.font.Font('assets/Ui/Font/NormalFont.ttf', 24)
+        text = restart_font.render('Press \'r\' to restart', False, (255, 255, 255))
+        self.screen.blit(text, (WIDTH // 2 - 120, HEIGHT // 2 + 65))
+        if keys[pygame.K_r]:
+            self._restart()
+
+    def _restart(self):
+        self.floor_tiles.empty()
+        self.detail_tiles.empty()
+        self.player.empty()
+        self.coins.empty()
+        self.enemies.empty()
+        self.time_left = self.game_length
+        self._setup_floor(self.floor_data)
+        self._setup_details(self.detail_data)
+        self.game_over = False
+
+    def update(self, keys):
+        if not self.game_over:
+            self._running_update(keys)
+        else:
+            self._game_over_update(keys)
